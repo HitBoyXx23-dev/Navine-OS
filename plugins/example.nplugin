@@ -1,0 +1,6 @@
+name=Hello Dock
+version=1
+type=dock_item
+label=Hello
+icon=/Icons/hello.png
+hotkey=0

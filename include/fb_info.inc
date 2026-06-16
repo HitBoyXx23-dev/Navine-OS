@@ -1,0 +1,1 @@
+%define FB_INFO_PHYS 0x5000

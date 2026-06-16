@@ -1,0 +1,2 @@
+// apps/photos/main.cpp
+int main() { return 0; }

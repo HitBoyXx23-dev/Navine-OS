@@ -1,0 +1,11 @@
+name=Navine Dark
+version=1
+primary=0xFF007AFF
+background=0xFF2C2C2E
+dock=0xCC1C1C1E
+menubar=0xE01C1C1E
+terminal=0xCC1E1E20
+blur=16
+transparency=0.85
+animation_speed=1.0
+wallpaper=/System/Wallpapers/default.navine
