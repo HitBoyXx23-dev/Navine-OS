@@ -1,0 +1,11 @@
+name=Navine Hybrid
+version=1.0
+author=Navine OS
+accent=0xFF65D6FF
+background=0xFF0A0A12
+menubar=0xE8171D28
+dock=0xD8141A24
+glass=0xF0111820
+radius=12
+blur=8
+mode=hybrid

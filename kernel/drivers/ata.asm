@@ -56,14 +56,29 @@ ata_read_one:
     mov dx, ATA_PRIMARY_IO + 7
     mov al, 0x20
     out dx, al
+    mov r9, 0x80000
 .wait:
+    dec r9
+    jz .fail
     in al, dx
+    cmp al, 0xFF
+    je .fail
+    test al, 0x80
+    jnz .wait
+    test al, 0x21
+    jnz .fail
     test al, 0x08
     jz .wait
     mov dx, ATA_PRIMARY_IO
     mov rcx, 256
     mov rdi, r13
     rep insw
+    ret
+.fail:
+    mov rdi, r13
+    mov rcx, 128
+    xor eax, eax
+    rep stosd
     ret
 
 ata_write_sectors:
@@ -110,12 +125,23 @@ ata_write_one:
     mov dx, ATA_PRIMARY_IO + 7
     mov al, 0x30
     out dx, al
+    mov r9, 0x80000
 .wait:
+    dec r9
+    jz .fail
     in al, dx
+    cmp al, 0xFF
+    je .fail
+    test al, 0x80
+    jnz .wait
+    test al, 0x21
+    jnz .fail
     test al, 0x08
     jz .wait
     mov dx, ATA_PRIMARY_IO
     mov rcx, 256
     mov rsi, r13
     rep outsw
+    ret
+.fail:
     ret

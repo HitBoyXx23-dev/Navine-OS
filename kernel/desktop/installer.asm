@@ -16,6 +16,10 @@ extern fb_height
 extern ata_read_sectors
 extern ata_write_sectors
 extern wallpaper_draw
+extern compat_set_profile
+extern gamemode_enable
+extern devmode_enable
+extern kernel_services_init
 %endif
 
 global init_installer
@@ -54,7 +58,7 @@ section .text
 init_installer:
     mov byte [installer_phase], 0
     mov byte [installer_completed], 0
-    mov byte [install_mode], 0
+    mov byte [install_mode], INSTALL_MODE_HYBRID
     mov byte [install_focus], 2
     mov byte [install_user], 1
     mov byte [install_user_len], 0
@@ -158,6 +162,11 @@ installer_render:
     ret
 
 render_installer_page:
+    mov edi, 20
+    mov esi, 20
+    lea rdx, [prompt_title]
+    mov ecx, COLOR_WHITE
+    call font_draw_string
     call wallpaper_draw
     mov eax, [fb_width]
     cmp eax, 620
@@ -401,7 +410,7 @@ render_prompt_focus_page:
     mov ecx, COLOR_NAVINE_BLUE
 .draw_opt:
     call font_draw_string
-    add esi, 32
+    add esi, 40
     inc bl
     jmp .opt
 
@@ -409,7 +418,7 @@ render_prompt_focus_page:
     mov edi, r12d
     add edi, 28
     mov esi, r13d
-    add esi, 324
+    add esi, 360
     lea rdx, [hint_keys]
     mov ecx, 0xFFB8D7F0
     call font_draw_string
@@ -1285,9 +1294,33 @@ installer_try_finish:
     mov byte [installer_dirty], 1
     ret
 .pass_ok:
+    call kernel_services_init
     call installer_save_disk_flag
+    call navinefs_format
+    call installer_apply_profiles
     mov byte [installer_completed], 1
     mov byte [installer_dirty], 1
+    ret
+
+installer_apply_profiles:
+    movzx eax, byte [install_mode]
+    mov al, al
+    call compat_set_profile
+    cmp byte [install_mode], INSTALL_MODE_HYBRID
+    je .hybrid
+    cmp byte [install_mode], INSTALL_MODE_LINUX
+    je .dev_only
+    cmp byte [install_focus], 0
+    jne .out
+    call gamemode_enable
+    jmp .out
+.hybrid:
+    call gamemode_enable
+    call devmode_enable
+    jmp .out
+.dev_only:
+    call devmode_enable
+.out:
     ret
 
 installer_selected_ptr:

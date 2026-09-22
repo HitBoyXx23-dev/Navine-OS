@@ -1,0 +1,8 @@
+NAME="Navine OS Linux Desktop"
+ID=navine
+ID_LIKE=debian
+VERSION_ID=1.0
+PRETTY_NAME="Navine OS Linux Desktop 1.0"
+HOME_URL="https://github.com/NavineDevs"
+SUPPORT_URL="https://github.com/NavineDevs"
+BUG_REPORT_URL="https://github.com/NavineDevs"

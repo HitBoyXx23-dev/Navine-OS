@@ -10,31 +10,48 @@ extern pic_send_eoi
 extern scheduler_tick
 extern keyboard_handler
 extern mouse_handler
+extern init_irq_vectors
+extern kernel_panic
 %endif
 
 global init_idt
 global irq_dispatch
 global exception_dispatch
+global idt
 
 section .bss
 idt:            resb 256 * 16
-idtr:           resb 10         ; 2-byte limit + 8-byte base (64-bit IDTR)
+idtr:           resb 10
+
+section .rodata
+align 8
+exception_stubs:
+    dq exc_0, exc_1, exc_2, exc_3, exc_4, exc_5, exc_6, exc_7
+    dq exc_8, exc_9, exc_10, exc_11, exc_12, exc_13, exc_14, exc_15
+    dq exc_16, exc_17, exc_18, exc_19, exc_20, exc_21, exc_22, exc_23
+    dq exc_24, exc_25, exc_26, exc_27, exc_28, exc_29, exc_30, exc_31
 
 section .text
 init_idt:
     mov rdi, idt
     xor rcx, rcx
 .fill:
+    cmp rcx, 32
+    jae .default_stub
+    mov rax, [exception_stubs + rcx * 8]
+    jmp .install
+.default_stub:
     mov rax, isr_stub
-    mov word [rdi], ax          ; offset[15:0]
-    mov word [rdi + 2], 0x08    ; code segment selector
-    mov byte [rdi + 4], 0       ; IST = 0
-    mov byte [rdi + 5], 0x8E    ; P=1, DPL=0, type=0xE (64-bit interrupt gate)
+.install:
+    mov word [rdi], ax
+    mov word [rdi + 2], 0x08
+    mov byte [rdi + 4], 0
+    mov byte [rdi + 5], 0x8E
     mov r8, rax
     shr r8, 16
-    mov word [rdi + 6], r8w     ; offset[31:16]
+    mov word [rdi + 6], r8w
     shr r8, 16
-    mov dword [rdi + 8], r8d    ; offset[63:32]
+    mov dword [rdi + 8], r8d
     add rdi, 16
     inc rcx
     cmp rcx, 256
@@ -42,13 +59,70 @@ init_idt:
     mov word [idtr], 256 * 16 - 1
     mov qword [idtr + 2], idt
     lidt [idtr]
+    call init_irq_vectors
     ret
+
+%macro EXC_NOERR 1
+align 16
+exc_%1:
+    cli
+    push qword 0
+    push %1
+    jmp exc_common
+%endmacro
+
+%macro EXC_ERR 1
+align 16
+exc_%1:
+    cli
+    push %1
+    jmp exc_common
+%endmacro
+
+EXC_NOERR 0
+EXC_NOERR 1
+EXC_NOERR 2
+EXC_NOERR 3
+EXC_NOERR 4
+EXC_NOERR 5
+EXC_NOERR 6
+EXC_NOERR 7
+EXC_ERR 8
+EXC_NOERR 9
+EXC_ERR 10
+EXC_ERR 11
+EXC_ERR 12
+EXC_ERR 13
+EXC_ERR 14
+EXC_NOERR 15
+EXC_NOERR 16
+EXC_ERR 17
+EXC_NOERR 18
+EXC_NOERR 19
+EXC_NOERR 20
+EXC_NOERR 21
+EXC_NOERR 22
+EXC_NOERR 23
+EXC_NOERR 24
+EXC_NOERR 25
+EXC_NOERR 26
+EXC_NOERR 27
+EXC_NOERR 28
+EXC_NOERR 29
+EXC_NOERR 30
+EXC_NOERR 31
+
+exc_common:
+    mov rsi, exc_msg
+    call kernel_panic
+    cli
+    hlt
+    jmp $
 
 isr_stub:
     iretq
 
 irq_dispatch:
-    ; rdi = irq number
     cmp rdi, 0
     je .timer
     cmp rdi, 1
@@ -76,11 +150,4 @@ exception_dispatch:
     ret
 
 section .rodata
-exc_msg: db "Kernel exception", 0
-
-global kernel_panic
-kernel_panic:
-    cli
-.halt:
-    hlt
-    jmp .halt
+exc_msg: db "CPU exception", 0

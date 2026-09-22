@@ -12,8 +12,15 @@ if (-not (Test-Path $buildPath)) { exit 0 }
 
 $keep = @(
     "navine.img",
+    "navine-desktop.img",
+    "navine-cli.img",
     "navine.vdi",
     "Navine OS.iso",
+    "Navine OS Desktop.iso",
+    "Navine OS CLI.iso",
+    "Navine OS Linux Desktop.iso",
+    "Navine OS Linux CLI.iso",
+    "Navine OS Linux.iso",
     "wallpaper.raw",
     "doom1.wad"
 )

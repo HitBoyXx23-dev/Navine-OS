@@ -15,6 +15,25 @@ from pathlib import Path
 ISO_SECTOR = 2048
 ISO_FILENAME = "Navine OS.iso"
 
+PVD_SYSTEM_ID = 8
+PVD_VOLUME_ID = 40
+PVD_ROOT_RECORD = 156
+PVD_VOLUME_SET_ID = 190
+PVD_PUBLISHER_ID = 318
+PVD_PREPARER_ID = 446
+PVD_APPLICATION_ID = 574
+PVD_COPYRIGHT_FILE_ID = 702
+PVD_ABSTRACT_FILE_ID = 739
+PVD_BIBLIOGRAPHIC_FILE_ID = 776
+PVD_CREATION_DATE = 813
+PVD_MODIFICATION_DATE = 830
+PVD_EXPIRATION_DATE = 847
+PVD_EFFECTIVE_DATE = 864
+PVD_FILE_STRUCTURE_VERSION = 881
+
+DATETIME_SET = b"2026062812000000" + bytes([0])
+DATETIME_UNSET = b"0000000000000000" + bytes([0])
+
 # El Torito HDD-emulation loads only the MBR (1 sector = 512 bytes).
 # The BIOS then maps INT 13h for the virtual drive to the embedded disk image,
 # so stage1 can read stage2/kernel from it using normal 512-byte LBA calls.
@@ -129,7 +148,7 @@ def build_iso(disk_img: Path, iso_path: Path) -> None:
     pathl_lba   = 21   # L-type (LE) path table
     pathm_lba   = 22   # M-type (BE) path table
     readme_lba  = 32
-    disk_lba    = 33
+    disk_lba    = 34
 
     total_sectors = disk_lba + disk_sectors
     iso = bytearray(total_sectors * ISO_SECTOR)
@@ -150,14 +169,14 @@ def build_iso(disk_img: Path, iso_path: Path) -> None:
     pt_entry = struct.pack("BB", 1, 0)           # dir-id length=1, ext-attr=0
     pt_entry += struct.pack("<I", root_lba)      # extent location (LE)
     pt_entry += struct.pack("<H", 1)             # parent directory number (LE)
-    pt_entry += b"\x01\x00"                      # dir identifier + even pad
+    pt_entry += b"\x00\x00"                      # root dir identifier + even pad
     path_table_l = pad(pt_entry, ISO_SECTOR)
 
     # --- M-type path table (big-endian) ---
     pt_entry_m = struct.pack("BB", 1, 0)
     pt_entry_m += struct.pack(">I", root_lba)
     pt_entry_m += struct.pack(">H", 1)
-    pt_entry_m += b"\x01\x00"
+    pt_entry_m += b"\x00\x00"
     path_table_m = pad(pt_entry_m, ISO_SECTOR)
 
     catalog = make_boot_catalog(disk_lba)
@@ -168,8 +187,8 @@ def build_iso(disk_img: Path, iso_path: Path) -> None:
     pvd[1:6] = b"CD001"
     pvd[6] = 1
     pvd[7] = 0
-    pvd[8:40]  = ascii_field("NAVINE_OS", 32)    # System Identifier
-    pvd[40:72] = ascii_field("NAVINE OS", 32)    # Volume Identifier
+    pvd[PVD_SYSTEM_ID:PVD_SYSTEM_ID + 32] = ascii_field("NAVINE_OS", 32)
+    pvd[PVD_VOLUME_ID:PVD_VOLUME_ID + 32] = ascii_field("NAVINE OS", 32)
     # bytes 72-79: Unused = 0
     struct.pack_into("<I", pvd, 80, total_sectors)    # Volume Space Size LE
     struct.pack_into(">I", pvd, 84, total_sectors)    # Volume Space Size BE
@@ -189,8 +208,20 @@ def build_iso(disk_img: Path, iso_path: Path) -> None:
     struct.pack_into(">I", pvd, 152, 0)               # Optional M-Path Table (absent)
     # Root Directory Record at bytes 156-189 (34 bytes)
     root_dr = dir_record(b"\x00", root_lba, ISO_SECTOR, flags=0x02)
-    pvd[156:156 + 34] = root_dr[:34]
-    pvd[860] = 1   # File Structure Version
+    pvd[PVD_ROOT_RECORD:PVD_ROOT_RECORD + 34] = root_dr[:34]
+
+    pvd[PVD_VOLUME_SET_ID:PVD_VOLUME_SET_ID + 128] = ascii_field("NAVINE OS", 128)
+    pvd[PVD_PUBLISHER_ID:PVD_PUBLISHER_ID + 128] = ascii_field("NAVINE DEVS", 128)
+    pvd[PVD_PREPARER_ID:PVD_PREPARER_ID + 128] = ascii_field("NAVINE OS BUILD TOOLS", 128)
+    pvd[PVD_APPLICATION_ID:PVD_APPLICATION_ID + 128] = ascii_field("NAVINE OS", 128)
+    pvd[PVD_COPYRIGHT_FILE_ID:PVD_COPYRIGHT_FILE_ID + 37] = ascii_field("", 37)
+    pvd[PVD_ABSTRACT_FILE_ID:PVD_ABSTRACT_FILE_ID + 37] = ascii_field("", 37)
+    pvd[PVD_BIBLIOGRAPHIC_FILE_ID:PVD_BIBLIOGRAPHIC_FILE_ID + 37] = ascii_field("", 37)
+    pvd[PVD_CREATION_DATE:PVD_CREATION_DATE + 17] = DATETIME_SET
+    pvd[PVD_MODIFICATION_DATE:PVD_MODIFICATION_DATE + 17] = DATETIME_SET
+    pvd[PVD_EXPIRATION_DATE:PVD_EXPIRATION_DATE + 17] = DATETIME_UNSET
+    pvd[PVD_EFFECTIVE_DATE:PVD_EFFECTIVE_DATE + 17] = DATETIME_SET
+    pvd[PVD_FILE_STRUCTURE_VERSION] = 1
 
     # --- El Torito Boot Record Volume Descriptor ---
     # Bytes 7-38:  Boot System Identifier MUST be "EL TORITO SPECIFICATION" (23 chars, zero-padded to 32)
@@ -231,8 +262,10 @@ def build_iso(disk_img: Path, iso_path: Path) -> None:
 
 def main() -> int:
     build_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("build")
-    disk = build_dir / "navine.img"
-    iso = build_dir / ISO_FILENAME
+    disk_name = sys.argv[2] if len(sys.argv) > 2 else "navine.img"
+    iso_name = sys.argv[3] if len(sys.argv) > 3 else ISO_FILENAME
+    disk = build_dir / disk_name
+    iso = build_dir / iso_name
     if not disk.exists():
         print(f"Missing {disk}", file=sys.stderr)
         return 1

@@ -1,0 +1,14 @@
+#!/bin/sh
+cat <<'HELP'
+Navine OS Linux - command reference
+
+  Applications menu     XFCE desktop and panel
+  Calamares             Install Navine OS Linux to disk
+  Terminal              xfce4-terminal
+
+  sudo -i               root shell (password: live)
+  ip a                  network interfaces
+  poweroff / reboot     shut down the machine
+
+Live system: changes persist only after installing to disk with Calamares.
+HELP

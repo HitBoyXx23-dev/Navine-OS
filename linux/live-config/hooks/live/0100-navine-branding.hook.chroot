@@ -1,0 +1,112 @@
+#!/bin/bash
+set -e
+
+BRAND="${LB_BUILD_SHARE:-/usr/share/live/build}/../../.."
+if [ -d /tmp/navine-branding ]; then
+    BRAND=/tmp/navine-branding
+fi
+
+if [ ! -d "$BRAND" ]; then
+    exit 0
+fi
+
+install -Dm644 "$BRAND/os-release" /etc/os-release
+install -Dm644 "$BRAND/hostname" /etc/hostname
+install -Dm644 "$BRAND/issue" /etc/issue
+install -Dm644 "$BRAND/motd" /etc/motd
+install -Dm644 "$BRAND/navine-banner" /etc/navine-banner
+install -Dm755 "$BRAND/navine-help" /usr/local/bin/navine-help
+install -Dm644 "$BRAND/profile-navine.sh" /etc/profile.d/navine.sh
+
+mkdir -p /etc/lightdm/lightdm.conf.d
+cat > /etc/lightdm/lightdm.conf.d/50-navine.conf <<'EOF'
+[Seat:*]
+autologin-user=live
+autologin-user-timeout=0
+user-session=xfce
+EOF
+
+mkdir -p /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml
+if [ -f "$BRAND/xfce4-panel.xml" ]; then
+    install -Dm644 "$BRAND/xfce4-panel.xml" /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml
+fi
+if [ -f "$BRAND/xfce4-desktop.xml" ]; then
+    install -Dm644 "$BRAND/xfce4-desktop.xml" /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml
+fi
+if [ -f "$BRAND/xsettings.xml" ]; then
+    install -Dm644 "$BRAND/xsettings.xml" /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
+fi
+
+mkdir -p /usr/share/backgrounds/navine
+if [ -f "$BRAND/wallpaper.png" ]; then
+    install -Dm644 "$BRAND/wallpaper.png" /usr/share/backgrounds/navine/wallpaper.png
+fi
+
+cat > /usr/share/applications/navine-calamares.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Install Navine OS Linux
+Comment=Install Navine OS Linux to your hard drive
+Exec=pkexec calamares
+Icon=system-installer
+Terminal=false
+Categories=System;
+EOF
+
+mkdir -p /etc/skel/Desktop
+ln -sf /usr/share/applications/navine-calamares.desktop /etc/skel/Desktop/Install\ Navine\ OS\ Linux.desktop
+
+mkdir -p /etc/calamares/branding/navine
+cat > /etc/calamares/branding/navine/branding.desc <<'EOF'
+---
+componentName: navine
+welcomeStyleCalamares: true
+welcomeExpandingLogo: true
+windowExpanding: normal
+windowSize: 800px,520px
+windowPlacement: center
+strings:
+    productName: Navine OS Linux
+    version: "1.0"
+    shortVersion: "1.0"
+    versionedName: Navine OS Linux 1.0
+    shortVersionedName: Navine 1.0
+    bootloaderEntryName: Navine OS Linux
+    productUrl: https://github.com/NavineDevs/Navine-OS
+    supportUrl: https://github.com/NavineDevs/Navine-OS
+    releaseNotesUrl: https://github.com/NavineDevs/Navine-OS/releases
+images:
+    productLogo: "/usr/share/backgrounds/navine/wallpaper.png"
+    productIcon: "/usr/share/backgrounds/navine/wallpaper.png"
+    productWelcome: "/usr/share/backgrounds/navine/wallpaper.png"
+slideshow: "show.qml"
+style:
+   sidebarBackground: "#0B1220"
+   sidebarText: "#E8EEF8"
+   sidebarTextSelect: "#65D6FF"
+EOF
+
+cat > /etc/calamares/branding/navine/show.qml <<'EOF'
+import QtQuick 2.0;
+import calamares.slideshow 1.0;
+Presentation {
+    id: presentation
+    Slide {
+        anchors.fill: parent
+        Rectangle { anchors.fill: parent; color: "#0B1220" }
+        Text {
+            anchors.centerIn: parent
+            text: "Installing Navine OS Linux"
+            color: "#E8EEF8"
+            font.pixelSize: 28
+        }
+    }
+}
+EOF
+
+if [ -f /etc/calamares/settings.conf ]; then
+    sed -i 's/^branding:.*/branding: navine/' /etc/calamares/settings.conf || true
+fi
+
+echo "Navine OS Linux branding applied."
+

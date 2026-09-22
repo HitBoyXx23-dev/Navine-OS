@@ -27,13 +27,21 @@ fb_bpp:         resd 1
 section .text
 init_framebuffer:
     mov rax, FB_INFO_PHYS
-    cmp dword [rax + FB_INFO_BPP_OFF], 8
-    je .from_boot
-    call vga_probe_framebuffer
-.from_boot:
-    mov rax, FB_INFO_PHYS
     mov rbx, [rax]
+    test rbx, rbx
+    jnz .from_boot
+    mov rbx, 0xE0000000
+    mov [rax], rbx
+.from_boot:
+    cmp rbx, 0x00F00000
+    jb .use_default
     mov [fb_base], rbx
+    jmp .dims
+.use_default:
+    mov rbx, 0xE0000000
+    mov [rax], rbx
+    mov [fb_base], rbx
+.dims:
     mov eax, [rax + 8]
     test eax, eax
     jnz .store_w
@@ -61,6 +69,10 @@ init_framebuffer:
     mov eax, VESA_BPP
 .store_bpp:
     mov [fb_bpp], eax
+    cmp dword [fb_bpp], 0
+    jne .out
+    mov dword [fb_bpp], 32
+.out:
     ret
 
 fb_clear_screen:
@@ -79,10 +91,24 @@ fb_clear_screen:
     call fb_fill_rect
     jmp .done
 .clear8:
-    mov rcx, [fb_width]
-    imul rcx, [fb_height]
-    mov eax, 0x01010101
-    rep stosd
+    push rbx
+    mov r9d, [fb_height]
+    mov r10d, [fb_pitch]
+    xor ebx, ebx
+.c8row:
+    cmp ebx, r9d
+    jge .c8done
+    mov eax, ebx
+    imul rax, r10
+    mov rdi, [fb_base]
+    add rdi, rax
+    mov ecx, [fb_width]
+    mov al, 0x01
+    rep stosb
+    inc ebx
+    jmp .c8row
+.c8done:
+    pop rbx
     jmp .done
 .clear24:
     mov edi, 0

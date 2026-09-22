@@ -39,6 +39,13 @@ calc_a:          resd 1
 calc_b:          resd 1
 calc_mode:       resb 1
 calc_result:     resb 8
+settings_dyn1:   resb 80
+settings_dyn2:   resb 80
+settings_dyn3:   resb 80
+settings_dyn4:   resb 80
+monitor_dyn1:    resb 80
+monitor_dyn2:    resb 80
+monitor_dyn3:    resb 80
 
 section .text
 init_simpleapps:
@@ -61,6 +68,7 @@ init_simpleapps:
     xor eax, eax
     mov ecx, 8
     rep stosb
+    call browser_init
     ret
 
 app_open_settings:
@@ -68,6 +76,7 @@ app_open_settings:
     jmp app_open_common
 app_open_browser:
     mov byte [app_type], 2
+    call browser_go_home
     jmp app_open_common
 app_open_store:
     mov byte [app_type], 3
@@ -179,24 +188,19 @@ app_body_render:
     ret
 
 render_settings:
-    lea rdx, [settings_l1]
+    call settings_fill
+    lea rdx, [settings_dyn1]
     call draw_line1
-    lea rdx, [settings_l2]
+    lea rdx, [settings_dyn2]
     call draw_line2
-    lea rdx, [settings_l3]
+    lea rdx, [settings_dyn3]
     call draw_line3
-    lea rdx, [settings_l4]
+    lea rdx, [settings_dyn4]
     call draw_line4
     ret
 render_browser:
-    lea rdx, [browser_l1]
-    call draw_line1
-    lea rdx, [browser_l2]
-    call draw_line2
-    lea rdx, [app_input]
-    call draw_input
-    lea rdx, [browser_l3]
-    call draw_line5
+    lea rdi, [app_input]
+    call browser_render_panel
     ret
 render_store:
     lea rdx, [store_l1]
@@ -235,11 +239,12 @@ render_media:
     call draw_line3
     ret
 render_monitor:
-    lea rdx, [monitor_l1]
+    call monitor_fill
+    lea rdx, [monitor_dyn1]
     call draw_line1
-    lea rdx, [monitor_l2]
+    lea rdx, [monitor_dyn2]
     call draw_line2
-    lea rdx, [monitor_l3]
+    lea rdx, [monitor_dyn3]
     call draw_line3
     ret
 render_assistant:
@@ -377,7 +382,7 @@ apps_handle_key:
     cmp byte [app_type], 9
     je .notes_key
     cmp byte [app_type], 2
-    je .input_key
+    je .browser_key
     cmp byte [app_type], 5
     je .calc_key
     cmp byte [app_type], 8
@@ -408,6 +413,15 @@ apps_handle_key:
     jmp .yes
 .input_key:
     call app_input_key
+    jmp .yes
+.browser_key:
+    cmp dl, 0x1C
+    je .browser_go
+    call app_input_key
+    jmp .yes
+.browser_go:
+    lea rdi, [app_input]
+    call browser_navigate
     jmp .yes
 .calc_key:
     cmp dl, 0x1C
@@ -563,6 +577,110 @@ app_scancode_ascii:
     mov al, ' '
     ret
 
+settings_fill:
+    lea rdi, [settings_dyn1]
+    lea rsi, [settings_l1]
+    call sa_copy
+    lea rdi, [settings_dyn2]
+    lea rsi, [settings_l2]
+    call sa_copy
+    lea rdi, [settings_dyn3]
+    lea rsi, [st_net_prefix]
+    call sa_copy
+    call net_is_ready
+    test rax, rax
+    jz .net_no
+    lea rsi, [st_net_up]
+    jmp .net_put
+.net_no:
+    lea rsi, [st_net_down]
+.net_put:
+    call sa_append
+    lea rdi, [settings_dyn4]
+    lea rsi, [st_token_prefix]
+    call sa_copy
+    lea rsi, [config_discord_token]
+    call sa_append
+    ret
+
+monitor_fill:
+    lea rdi, [monitor_dyn1]
+    lea rsi, [mon_tick_prefix]
+    call sa_copy
+    mov rax, [pit_ticks]
+    call sa_append_u64
+    lea rdi, [monitor_dyn2]
+    lea rsi, [mon_heap_prefix]
+    call sa_copy
+    call heap_free_bytes
+    call sa_append_u64
+    lea rdi, [monitor_dyn3]
+    lea rsi, [mon_net_prefix]
+    call sa_copy
+    call net_is_ready
+    test rax, rax
+    jz .mno
+    lea rsi, [st_net_up]
+    jmp .mput
+.mno:
+    lea rsi, [st_net_down]
+.mput:
+    call sa_append
+    ret
+
+sa_copy:
+.copy:
+    mov al, [rsi]
+    mov [rdi], al
+    test al, al
+    jz .done
+    inc rsi
+    inc rdi
+    jmp .copy
+.done:
+    ret
+
+sa_append:
+.seek:
+    cmp byte [rdi], 0
+    je .put
+    inc rdi
+    jmp .seek
+.put:
+    mov al, [rsi]
+    mov [rdi], al
+    test al, al
+    jz .out
+    inc rsi
+    inc rdi
+    jmp .put
+.out:
+    ret
+
+sa_append_u64:
+    push rbx
+    mov rbx, rax
+    mov ecx, 20
+    lea rdi, [sa_num_buf + 19]
+    mov byte [rdi], 0
+.digit:
+    xor edx, edx
+    mov eax, ebx
+    mov esi, 10
+    div esi
+    add dl, '0'
+    dec rdi
+    mov [rdi], dl
+    mov ebx, eax
+    test ebx, ebx
+    jnz .digit
+    mov rsi, rdi
+    call sa_append
+    pop rbx
+    ret
+
+sa_num_buf: times 20 db 0
+
 app_title_ptr:
     movzx eax, byte [app_type]
     cmp al, 1
@@ -633,15 +751,22 @@ title_plugins: db "Plugin Manager", 0
 title_studio: db "Plugin Developer Studio", 0
 settings_l1: db "Appearance: wallpaper active, dark glass theme", 0
 settings_l2: db "Input: keyboard, PS/2 mouse, focused windows", 0
-settings_l3: db "Apps: native panels enabled across modes", 0
-settings_l4: db "Security: local profile, plugin sandbox planned", 0
+settings_l3: db "Network: e1000 NAT  DHCP  ping curl ifconfig in terminal", 0
+settings_l4: db "Discord token: set in config/navine.cfg", 0
+st_net_prefix: db "Network: ", 0
+st_net_up: db "e1000 ready (DHCP/NAT)", 0
+st_net_down: db "offline", 0
+st_token_prefix: db "Token: ", 0
+mon_tick_prefix: db "Timer ticks: ", 0
+mon_heap_prefix: db "Heap free bytes: ", 0
+mon_net_prefix: db "NIC status: ", 0
 browser_l1: db "Enter address or search term:", 0
 browser_l2: db "Network service is staged inside Navine OS.", 0
 browser_l3: db "Demo page: local://navine/home", 0
-store_l1: db "Featured apps", 0
-store_l2: db "Navine Grid - installed", 0
-store_l3: db "Plugin Tools - installed", 0
-store_l4: db "Click window body to launch Navine Grid.", 0
+store_l1: db "Game stores (external launchers)", 0
+store_l2: db "Steam / Epic / GOG wrappers ready", 0
+store_l3: db "Navine Grid built-in game installed", 0
+store_l4: db "Type: steam epic gog in terminal", 0
 notes_l1: db "Notes save in memory for this session:", 0
 notes_l2: db "Type to edit. Esc closes.", 0
 calc_l1: db "Calculator: type A+B then Enter", 0
@@ -649,9 +774,9 @@ calc_l2: db "Result:", 0
 media_l1: db "Media Player", 0
 media_l2: db "Playlist: Welcome Tone, Focus Loop, Night Theme", 0
 media_l3: db "Playback engine staged. UI controls ready.", 0
-monitor_l1: db "CPU: stable   RAM: 4 MB window workspace", 0
-monitor_l2: db "Input: active   Graphics: 1920x1080 compositor", 0
-monitor_l3: db "Processes: shell, desktop, apps, grid", 0
+monitor_l1: db "Game library: Navine Grid + Vulkan stub", 0
+monitor_l2: db "Network: e1000 probe   ACPI battery: 85%", 0
+monitor_l3: db "Game Mode FPS overlay when G is pressed", 0
 assistant_l1: db "Ask Navine Assistant:", 0
 assistant_l2: db "Type a prompt. Local response engine staged.", 0
 editor_l1: db "Editor buffer:", 0

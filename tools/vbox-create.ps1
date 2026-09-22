@@ -71,7 +71,7 @@ Write-Host "Creating VM: $VmName"
 & $vboxManage createvm --name $VmName --ostype Other_64 --register
 if ($LASTEXITCODE -ne 0) { throw "createvm failed" }
 
-& $vboxManage modifyvm $VmName --memory 512 --vram 128 --graphicscontroller vboxvga --firmware bios --chipset piix3 --ioapic on --pae on --longmode on --hwvirtex on --nestedpaging on --rtcuseutc on --mouse ps2 --boot1 disk --boot2 none --boot3 none --boot4 none --audio-driver none --accelerate3d off | Out-Null
+& $vboxManage modifyvm $VmName --memory 512 --vram 16 --graphicscontroller vboxvga --firmware bios --chipset piix3 --ioapic on --pae on --longmode on --hwvirtex on --nestedpaging on --rtcuseutc on --mouse ps2 --boot1 disk --boot2 dvd --boot3 none --boot4 none --audio-driver none --accelerate3d off --nic1 nat --nictype1 82540EM --cableconnected1 on --bootfloppy none | Out-Null
 
 & $vboxManage storagectl $VmName --name "IDE" --add ide --controller PIIX4 --portcount 2 --bootable on
 if ($LASTEXITCODE -ne 0) { throw "storagectl failed" }
@@ -79,6 +79,10 @@ if ($LASTEXITCODE -ne 0) { throw "storagectl failed" }
 Write-Host "Attaching disk: $vdiPath"
 & $vboxManage storageattach $VmName --storagectl "IDE" --port 0 --device 0 --type hdd --medium $vdiPath
 if ($LASTEXITCODE -ne 0) { throw "storageattach failed" }
+
+$serialLog = Join-Path $buildPath "serial.log"
+if (Test-Path $serialLog) { Remove-Item -LiteralPath $serialLog -Force -ErrorAction SilentlyContinue }
+& $vboxManage modifyvm $VmName --uart1 0x3F8 4 --uartmode1 file $serialLog 2>$null | Out-Null
 
 & $vboxManage setextradata $VmName "GUI/ScaleFactor" "1" 2>$null | Out-Null
 & $vboxManage setextradata $VmName "GUI/LastGuestSizeHint" "1920,1080" 2>$null | Out-Null

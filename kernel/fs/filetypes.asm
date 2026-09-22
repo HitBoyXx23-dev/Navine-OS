@@ -18,6 +18,9 @@
 %define FT_DISK        13
 %define FT_JSON        14
 %define FT_HTML        15
+%define FT_ELF         16
+%define FT_DMG         17
+%define FT_APPIMAGE    18
 %define FT_ENTRY_SIZE  16
 
 global init_filetypes
@@ -93,6 +96,12 @@ filetype_handler_name:
     je .json
     cmp al, FT_HTML
     je .html
+    cmp al, FT_ELF
+    je .elf
+    cmp al, FT_DMG
+    je .dmg
+    cmp al, FT_APPIMAGE
+    je .elf
     lea rax, [name_unknown]
     ret
 .text:      lea rax, [name_text]; ret
@@ -110,6 +119,8 @@ filetype_handler_name:
 .disk:      lea rax, [name_disk]; ret
 .json:      lea rax, [name_json]; ret
 .html:      lea rax, [name_html]; ret
+.elf:       lea rax, [name_elf]; ret
+.dmg:       lea rax, [name_dmg]; ret
 
 find_extension:
     mov rsi, rdi
@@ -193,7 +204,12 @@ ext_table:
     db "ps1",0,0,0,0,0,0,0,0,0, FT_SCRIPT, 0,0,0
     db "cmd",0,0,0,0,0,0,0,0,0, FT_SCRIPT, 0,0,0
     db "bin",0,0,0,0,0,0,0,0,0, FT_BINARY, 0,0,0
-    db "navelf",0,0,0,0,0,0,0, FT_BINARY, 0,0,0
+    db "navelf",0,0,0,0,0,0,0, FT_ELF, 0,0,0
+    db "elf",0,0,0,0,0,0,0,0,0, FT_ELF, 0,0,0
+    db "so",0,0,0,0,0,0,0,0,0,0, FT_ELF, 0,0,0
+    db "AppImage",0,0,0,0,0, FT_APPIMAGE, 0,0,0
+    db "dmg",0,0,0,0,0,0,0,0,0, FT_DMG, 0,0,0
+    db "sparseimage",0,0, FT_DMG, 0,0,0
     db "o",0,0,0,0,0,0,0,0,0,0,0, FT_BINARY, 0,0,0
     db "obj",0,0,0,0,0,0,0,0,0, FT_BINARY, 0,0,0
     db "wad",0,0,0,0,0,0,0,0,0, FT_WAD, 0,0,0
@@ -247,3 +263,5 @@ name_navapp:    db "Navine App", 0
 name_disk:      db "Disk Image", 0
 name_json:      db "JSON Viewer", 0
 name_html:      db "Browser", 0
+name_elf:       db "Linux ELF", 0
+name_dmg:       db "macOS DMG", 0

@@ -6,6 +6,7 @@
 %include "macros.inc"
 
 global init_mouse
+global init_mouse_defaults
 global mouse_handler
 global mouse_poll
 global mouse_process_byte
@@ -13,6 +14,8 @@ global mouse_render
 global mouse_x
 global mouse_y
 global mouse_buttons
+global mouse_cycle
+global mouse_irq_active
 
 %ifndef NAVINE_LINK_BUILD
 extern fb_fill_rect
@@ -26,20 +29,38 @@ mouse_y:        resd 1
 mouse_buttons:  resb 1
 mouse_cycle:    resb 1
 mouse_packet:   resb 3
+mouse_irq_active: resb 1
 
 section .text
-init_mouse:
+init_mouse_defaults:
     mov eax, [fb_width]
+    test eax, eax
+    jnz .have_w
+    mov eax, VESA_WIDTH
+.have_w:
     shr eax, 1
     mov [mouse_x], eax
     mov eax, [fb_height]
+    test eax, eax
+    jnz .have_h
+    mov eax, VESA_HEIGHT
+.have_h:
     shr eax, 1
     mov [mouse_y], eax
     mov byte [mouse_buttons], 0
     mov byte [mouse_cycle], 0
+    ret
+
+init_mouse:
+    call init_mouse_defaults
+    mov byte [mouse_irq_active], 0
     call ps2_wait_input
     mov al, 0xA8
     OUTB PS2_COMMAND_PORT, al
+    call ps2_enable_irq_config
+    mov al, 0xFF
+    call mouse_send_command
+    call mouse_drain
     mov al, 0xF6
     call mouse_send_command
     mov al, 0xE8
@@ -52,6 +73,34 @@ init_mouse:
     call mouse_send_command
     mov al, 0xF4
     call mouse_send_command
+    mov byte [mouse_cycle], 0
+    ret
+
+ps2_enable_irq_config:
+    push rbx
+    call ps2_wait_input
+    mov al, 0x20
+    OUTB PS2_COMMAND_PORT, al
+    call ps2_wait_output
+    INB PS2_DATA_PORT, al
+    or al, 0x03
+    and al, 0xDF
+    mov bl, al
+    call ps2_wait_input
+    mov al, 0x60
+    OUTB PS2_COMMAND_PORT, al
+    call ps2_wait_input
+    OUTB PS2_DATA_PORT, bl
+    pop rbx
+    ret
+
+mouse_drain:
+    call ps2_wait_output
+    INB PS2_DATA_PORT, al
+    call ps2_wait_output
+    INB PS2_DATA_PORT, al
+    call ps2_wait_output
+    INB PS2_DATA_PORT, al
     ret
 
 ps2_wait_input:
@@ -77,37 +126,33 @@ ps2_wait_output:
     ret
 
 mouse_send_command:
-    push rax
+    push rbx
+    mov bl, al
+    mov bh, 3
+.attempt:
     call ps2_wait_input
     mov al, 0xD4
     OUTB PS2_COMMAND_PORT, al
     call ps2_wait_input
-    pop rax
-    OUTB PS2_DATA_PORT, al
+    OUTB PS2_DATA_PORT, bl
     call ps2_wait_output
     INB PS2_DATA_PORT, al
+    cmp al, 0xFE
+    jne .done
+    dec bh
+    jnz .attempt
+.done:
+    pop rbx
     ret
 
 mouse_handler:
+    mov byte [mouse_irq_active], 1
     INB PS2_DATA_PORT, al
     call mouse_process_byte
     ret
 
 mouse_poll:
     xor r9d, r9d
-.poll:
-    mov dx, PS2_STATUS_PORT
-    in al, dx
-    test al, 1
-    jz .done
-    test al, 0x20
-    jz .done
-    mov dx, PS2_DATA_PORT
-    in al, dx
-    call mouse_process_byte
-    jmp .poll
-.done:
-    mov eax, r9d
     ret
 
 mouse_process_byte:

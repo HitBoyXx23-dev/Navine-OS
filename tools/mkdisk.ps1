@@ -1,5 +1,7 @@
 param(
-    [string]$BuildDir = "build"
+    [string]$BuildDir = "build",
+    [string]$KernelName = "kernel.bin",
+    [string]$OutputImg = "navine.img"
 )
 
 $ErrorActionPreference = "Stop"
@@ -10,7 +12,7 @@ $DoomBinLba = 8192
 $DoomWadLba = 9216
 $NavAppLba = 30000
 $WallpaperLba = 12800
-$TotalSectors = 65536
+$TotalSectors = 71680
 
 function Read-PaddedFile([string]$Path, [int]$Size) {
     [byte[]]$data = [System.IO.File]::ReadAllBytes($Path)
@@ -59,7 +61,7 @@ $buildPath = Join-Path $root $BuildDir
 
 $stage1Path = Join-Path $buildPath "stage1.bin"
 $stage2Path = Join-Path $buildPath "stage2.bin"
-$kernelPath = Join-Path $buildPath "kernel.bin"
+$kernelPath = Join-Path $buildPath $KernelName
 
 if (-not (Test-Path $stage1Path)) { throw "Missing $stage1Path" }
 if (-not (Test-Path $stage2Path)) { throw "Missing $stage2Path" }
@@ -124,6 +126,6 @@ while ($img.Count -lt ($TotalSectors * $Sector)) {
     [void]$img.Add(0)
 }
 
-$imgPath = Join-Path $buildPath "navine.img"
+$imgPath = Join-Path $buildPath $OutputImg
 [System.IO.File]::WriteAllBytes($imgPath, $img.ToArray())
 Write-Host "Created $imgPath ($($img.Count) bytes, x86-64 bootable MBR)"

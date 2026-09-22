@@ -20,6 +20,9 @@
 %define FT_DISK        13
 %define FT_JSON        14
 %define FT_HTML        15
+%define FT_ELF         16
+%define FT_DMG         17
+%define FT_APPIMAGE    18
 
 global init_launcher
 global filetype_run
@@ -71,6 +74,12 @@ filetype_run:
     je .disk
     cmp bl, FT_BINARY
     je .binary
+    cmp bl, FT_ELF
+    je .elf
+    cmp bl, FT_APPIMAGE
+    je .elf
+    cmp bl, FT_DMG
+    je .dmg
     jmp .unknown
 
 .text:
@@ -114,18 +123,45 @@ filetype_run:
     jmp .done
 .pe:
     mov rdi, r12
-    call pe_load
+    call compat_pe_load
     test rax, rax
     jnz .pe_ok
     lea rdi, [msg_pe_fail]
     call terminal_write
     jmp .done
 .pe_ok:
+    call pe_loader_exec
     lea rdi, [msg_pe_ok]
     call terminal_write
     jmp .done
 .navapp:
-    lea rdi, [msg_navapp_open]
+    call cppapp_launch
+    lea rdi, [msg_navapp_ok]
+    call terminal_write
+    jmp .done
+.elf:
+    mov rdi, r12
+    call compat_elf_load
+    test rax, rax
+    jnz .elf_run
+    lea rdi, [msg_elf_fail]
+    call terminal_write
+    jmp .done
+.elf_run:
+    call elf_run_user
+    lea rdi, [msg_elf_ok]
+    call terminal_write
+    jmp .done
+.dmg:
+    mov rdi, r12
+    call compat_dmg_mount
+    test rax, rax
+    jnz .dmg_ok
+    lea rdi, [msg_dmg_fail]
+    call terminal_write
+    jmp .done
+.dmg_ok:
+    lea rdi, [msg_dmg_ok]
     call terminal_write
     jmp .done
 .disk:
@@ -154,6 +190,10 @@ msg_image_open:   db "Opening in Photos...", 10, 0
 msg_archive_open: db "Opening archive...", 10, 0
 msg_pe_ok:        db "Executable loaded", 10, 0
 msg_pe_fail:      db "Executable load unavailable", 10, 0
-msg_navapp_open:  db "Launching Navine app...", 10, 0
+msg_navapp_ok:    db "Navine app launched", 10, 0
+msg_elf_ok:       db "ELF mapped for Linux compat", 10, 0
+msg_elf_fail:     db "ELF load failed", 10, 0
+msg_dmg_ok:       db "DMG volume mounted", 10, 0
+msg_dmg_fail:     db "DMG mount failed", 10, 0
 msg_disk_open:    db "Mounting disk image...", 10, 0
 msg_binary_open:  db "Binary loader invoked", 10, 0

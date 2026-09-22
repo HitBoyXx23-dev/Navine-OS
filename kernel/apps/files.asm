@@ -2,6 +2,8 @@
 
 [BITS 64]
 
+%include "constants.inc"
+
 global init_files
 global files_toggle
 global files_render
@@ -17,12 +19,58 @@ section .bss
 files_visible:   resb 1
 files_selection: resd 1
 files_mouse_last: resb 1
+files_count:     resd 1
+files_names:     resb 640
 
 section .text
 init_files:
     mov byte [files_visible], 0
     mov dword [files_selection], 0
     mov byte [files_mouse_last], 0
+    call files_refresh
+    ret
+
+files_refresh:
+    xor ebx, ebx
+    mov dword [files_count], 0
+    lea rdi, [files_names]
+.clear:
+    cmp ebx, 10
+    jae .scan
+    mov byte [rdi], 0
+    add rdi, 64
+    inc ebx
+    jmp .clear
+.scan:
+    xor ebx, ebx
+.loop:
+    mov esi, ebx
+    call navinefs_list_entry
+    test rax, rax
+    jz .next
+    mov ecx, [files_count]
+    cmp ecx, 10
+    jae .done
+    imul rdx, rcx, 64
+    lea rdi, [files_names + rdx]
+    mov byte [rdi], '1'
+    add rdi, 2
+    lea rsi, [rax]
+.copy:
+    mov al, [rsi]
+    mov [rdi], al
+    test al, al
+    jz .next_entry
+    inc rsi
+    inc rdi
+    jmp .copy
+.next_entry:
+    inc dword [files_count]
+.next:
+    inc ebx
+    cmp ebx, NAVINEFS_MAX_INODES
+    jb .loop
+.done:
     ret
 
 files_toggle:
@@ -32,6 +80,7 @@ files_toggle:
 files_render:
     cmp byte [files_visible], 0
     je .done
+    call files_refresh
     mov edi, 80
     mov esi, 80
     mov edx, 360
@@ -50,46 +99,29 @@ files_render:
     call font_draw_string
     mov edi, 96
     mov esi, 130
-    lea rdx, [file_1]
+    xor ebx, ebx
+.floop:
+    cmp ebx, [files_count]
+    jae .fend
+    imul eax, ebx, 64
+    lea rdx, [files_names + rax]
+    call font_draw_string
+    add esi, 20
+    inc ebx
+    jmp .floop
+.fend:
+    cmp dword [files_count], 0
+    jne .hint
+    lea rdx, [file_empty]
+    call font_draw_string
+.hint:
+    mov edi, 96
+    mov esi, 330
+    lea rdx, [git_status]
+    mov ecx, 0xFF7CFF9A
     call font_draw_string
     mov edi, 96
-    mov esi, 150
-    lea rdx, [file_2]
-    call font_draw_string
-    mov edi, 96
-    mov esi, 170
-    lea rdx, [file_3]
-    call font_draw_string
-    mov edi, 96
-    mov esi, 190
-    lea rdx, [file_4]
-    call font_draw_string
-    mov edi, 96
-    mov esi, 210
-    lea rdx, [file_5]
-    call font_draw_string
-    mov edi, 96
-    mov esi, 230
-    lea rdx, [file_6]
-    call font_draw_string
-    mov edi, 96
-    mov esi, 250
-    lea rdx, [file_7]
-    call font_draw_string
-    mov edi, 96
-    mov esi, 270
-    lea rdx, [file_8]
-    call font_draw_string
-    mov edi, 96
-    mov esi, 290
-    lea rdx, [file_9]
-    call font_draw_string
-    mov edi, 96
-    mov esi, 310
-    lea rdx, [file_10]
-    call font_draw_string
-    mov edi, 96
-    mov esi, 340
+    mov esi, 350
     lea rdx, [hint_files]
     mov ecx, 0xFFAAAAAA
     call font_draw_string
@@ -173,17 +205,8 @@ files_handle_mouse:
 section .rodata
 title_files: db "Navine Vault", 0
 files_close_x: db "X", 0
-hint_files:  db "Press 1-0 to open, F8 to close", 0
-file_1:  db "1 Welcome Note", 0
-file_2:  db "2 Team Memo", 0
-file_3:  db "3 Workspace Config", 0
-file_4:  db "4 Portal Page", 0
-file_5:  db "5 Automation Script", 0
-file_6:  db "6 Navine Grid", 0
-file_7:  db "7 Aurora Theme", 0
-file_8:  db "8 Insight Plugin", 0
-file_9:  db "9 Navine App", 0
-file_10: db "0 Archive Bundle", 0
+hint_files:  db "Click entry or F8 to close", 0
+file_empty:  db "No NavineFS files yet", 0
 
 file_name_1:  db "readme.txt", 0
 file_name_2:  db "hello.txt", 0
@@ -191,10 +214,12 @@ file_name_3:  db "config.json", 0
 file_name_4:  db "page.html", 0
 file_name_5:  db "script.sh", 0
 file_name_6:  db "doom1.wad", 0
-file_name_7:  db "default.navinetheme", 0
-file_name_8:  db "sample.nplugin", 0
+file_name_7:  db "sample.exe", 0
+file_name_8:  db "sample.elf", 0
 file_name_9:  db "app.navapp", 0
-file_name_10: db "archive.zip", 0
+file_name_10: db "demo.dmg", 0
+
+git_status: db "Git: main (clean)", 0
 
 file_ptrs:
     dq file_name_1, file_name_2, file_name_3, file_name_4, file_name_5

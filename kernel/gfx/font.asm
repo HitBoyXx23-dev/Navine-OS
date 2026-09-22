@@ -1,66 +1,71 @@
-; Navine OS - Compact 5x7 UI Font
+; Navine OS - 8x16 UI Font
 
 [BITS 64]
 
 global font_draw_char
 global font_draw_string
+global font_init
+global font_advance
+global font_line_height
+global font_text_width
+global font_scale
 
 %ifndef NAVINE_LINK_BUILD
 extern fb_put_pixel
+extern fb_width
 %endif
 
 section .rodata
-digit_font:
-    db 0x0E,0x11,0x13,0x15,0x19,0x11,0x0E ; 0
-    db 0x04,0x0C,0x04,0x04,0x04,0x04,0x0E ; 1
-    db 0x0E,0x11,0x01,0x02,0x04,0x08,0x1F ; 2
-    db 0x1E,0x01,0x01,0x0E,0x01,0x01,0x1E ; 3
-    db 0x02,0x06,0x0A,0x12,0x1F,0x02,0x02 ; 4
-    db 0x1F,0x10,0x10,0x1E,0x01,0x01,0x1E ; 5
-    db 0x0E,0x10,0x10,0x1E,0x11,0x11,0x0E ; 6
-    db 0x1F,0x01,0x02,0x04,0x08,0x08,0x08 ; 7
-    db 0x0E,0x11,0x11,0x0E,0x11,0x11,0x0E ; 8
-    db 0x0E,0x11,0x11,0x0F,0x01,0x01,0x0E ; 9
+%include "gfx/font_data.inc"
 
-upper_font:
-    db 0x0E,0x11,0x11,0x1F,0x11,0x11,0x11 ; A
-    db 0x1E,0x11,0x11,0x1E,0x11,0x11,0x1E ; B
-    db 0x0F,0x10,0x10,0x10,0x10,0x10,0x0F ; C
-    db 0x1E,0x11,0x11,0x11,0x11,0x11,0x1E ; D
-    db 0x1F,0x10,0x10,0x1E,0x10,0x10,0x1F ; E
-    db 0x1F,0x10,0x10,0x1E,0x10,0x10,0x10 ; F
-    db 0x0F,0x10,0x10,0x13,0x11,0x11,0x0F ; G
-    db 0x11,0x11,0x11,0x1F,0x11,0x11,0x11 ; H
-    db 0x0E,0x04,0x04,0x04,0x04,0x04,0x0E ; I
-    db 0x07,0x02,0x02,0x02,0x02,0x12,0x0C ; J
-    db 0x11,0x12,0x14,0x18,0x14,0x12,0x11 ; K
-    db 0x10,0x10,0x10,0x10,0x10,0x10,0x1F ; L
-    db 0x11,0x1B,0x15,0x15,0x11,0x11,0x11 ; M
-    db 0x11,0x19,0x15,0x13,0x11,0x11,0x11 ; N
-    db 0x0E,0x11,0x11,0x11,0x11,0x11,0x0E ; O
-    db 0x1E,0x11,0x11,0x1E,0x10,0x10,0x10 ; P
-    db 0x0E,0x11,0x11,0x11,0x15,0x12,0x0D ; Q
-    db 0x1E,0x11,0x11,0x1E,0x14,0x12,0x11 ; R
-    db 0x0F,0x10,0x10,0x0E,0x01,0x01,0x1E ; S
-    db 0x1F,0x04,0x04,0x04,0x04,0x04,0x04 ; T
-    db 0x11,0x11,0x11,0x11,0x11,0x11,0x0E ; U
-    db 0x11,0x11,0x11,0x11,0x11,0x0A,0x04 ; V
-    db 0x11,0x11,0x11,0x15,0x15,0x15,0x0A ; W
-    db 0x11,0x11,0x0A,0x04,0x0A,0x11,0x11 ; X
-    db 0x11,0x11,0x0A,0x04,0x04,0x04,0x04 ; Y
-    db 0x1F,0x01,0x02,0x04,0x08,0x10,0x1F ; Z
-
-punct_dot:   db 0x00,0x00,0x00,0x00,0x00,0x0C,0x0C
-punct_comma: db 0x00,0x00,0x00,0x00,0x0C,0x04,0x08
-punct_colon: db 0x00,0x0C,0x0C,0x00,0x0C,0x0C,0x00
-punct_dash:  db 0x00,0x00,0x00,0x1F,0x00,0x00,0x00
-punct_slash: db 0x01,0x02,0x02,0x04,0x08,0x08,0x10
-punct_gt:    db 0x10,0x08,0x04,0x02,0x04,0x08,0x10
-punct_box:   db 0x1F,0x11,0x15,0x15,0x15,0x11,0x1F
+section .bss
+font_scale: resd 1
 
 section .text
+font_init:
+    mov dword [font_scale], 1
+    mov eax, [fb_width]
+    cmp eax, 1920
+    jb .done
+    mov dword [font_scale], 2
+.done:
+    ret
+
+font_advance:
+    mov eax, [font_scale]
+    test eax, eax
+    jnz .have
+    mov eax, 1
+.have:
+    imul eax, FONT_CELL_W
+    ret
+
+font_line_height:
+    mov eax, [font_scale]
+    test eax, eax
+    jnz .have
+    mov eax, 1
+.have:
+    imul eax, FONT_CELL_H
+    ret
+
+font_text_width:
+    push rbx
+    mov rbx, rdi
+    xor ecx, ecx
+.count:
+    cmp byte [rbx], 0
+    je .done
+    inc ecx
+    inc rbx
+    jmp .count
+.done:
+    call font_advance
+    imul eax, ecx
+    pop rbx
+    ret
+
 font_draw_char:
-    ; rdi=x, rsi=y, dl=char, ecx=color
     push rbx
     push r12
     push r13
@@ -72,92 +77,75 @@ font_draw_char:
     mov r13d, esi
     mov r14d, ecx
     movzx eax, dl
-
-    cmp al, ' '
-    je .out
-    cmp al, 'a'
-    jb .classify
-    cmp al, 'z'
-    ja .classify
-    sub al, 32
-
-.classify:
-    cmp al, '0'
-    jb .punct
-    cmp al, '9'
-    ja .letters
-    sub al, '0'
-    movzx eax, al
-    imul eax, 7
-    lea rbx, [digit_font + rax]
-    jmp .draw
-
-.letters:
-    cmp al, 'A'
-    jb .punct
-    cmp al, 'Z'
-    ja .punct
-    sub al, 'A'
-    movzx eax, al
-    imul eax, 7
-    lea rbx, [upper_font + rax]
-    jmp .draw
-
-.punct:
-    cmp al, '.'
-    je .dot
-    cmp al, ','
-    je .comma
-    cmp al, ':'
-    je .colon
-    cmp al, '-'
-    je .dash
-    cmp al, '/'
-    je .slash
-    cmp al, '>'
-    je .gt
-    lea rbx, [punct_box]
-    jmp .draw
-.dot:
-    lea rbx, [punct_dot]
-    jmp .draw
-.comma:
-    lea rbx, [punct_comma]
-    jmp .draw
-.colon:
-    lea rbx, [punct_colon]
-    jmp .draw
-.dash:
-    lea rbx, [punct_dash]
-    jmp .draw
-.slash:
-    lea rbx, [punct_slash]
-    jmp .draw
-.gt:
-    lea rbx, [punct_gt]
-
-.draw:
+    cmp al, FONT_FIRST_CHAR
+    jb .out
+    cmp al, FONT_LAST_CHAR
+    ja .out
+    sub eax, FONT_FIRST_CHAR
+    imul eax, FONT_CELL_H
+    lea rbx, [font_glyphs]
+    add rbx, rax
+    mov r11d, [font_scale]
+    test r11d, r11d
+    jnz .have_scale
+    mov r11d, 1
+.have_scale:
     xor r15d, r15d
 .row:
-    cmp r15d, 7
+    cmp r15d, FONT_CELL_H
     jae .out
     movzx eax, byte [rbx + r15]
+    test eax, eax
+    jz .next_row
     xor r10d, r10d
 .col:
-    cmp r10d, 5
+    cmp r10d, FONT_CELL_W
     jae .next_row
-    mov r11d, 0x10
     mov ecx, r10d
-    shr r11d, cl
-    test eax, r11d
+    mov edx, 0x80
+    shr edx, cl
+    test eax, edx
     jz .skip
-    mov edi, r12d
-    add edi, r10d
-    mov esi, r13d
-    add esi, r15d
-    mov edx, r14d
     push rax
+    mov edi, r10d
+    imul edi, r11d
+    add edi, r12d
+    mov esi, r15d
+    imul esi, r11d
+    add esi, r13d
+    mov edx, r14d
     call fb_put_pixel
+    cmp r11d, 2
+    jb .drawn
+    mov edi, r10d
+    imul edi, r11d
+    add edi, r12d
+    inc edi
+    mov esi, r15d
+    imul esi, r11d
+    add esi, r13d
+    mov edx, r14d
+    call fb_put_pixel
+    mov edi, r10d
+    imul edi, r11d
+    add edi, r12d
+    mov esi, r15d
+    imul esi, r11d
+    add esi, r13d
+    inc esi
+    mov edx, r14d
+    call fb_put_pixel
+    mov edi, r10d
+    imul edi, r11d
+    add edi, r12d
+    inc edi
+    mov esi, r15d
+    imul esi, r11d
+    add esi, r13d
+    inc esi
+    mov edx, r14d
+    call fb_put_pixel
+.drawn:
     pop rax
 .skip:
     inc r10d
@@ -165,7 +153,6 @@ font_draw_char:
 .next_row:
     inc r15d
     jmp .row
-
 .out:
     pop rcx
     pop r15
@@ -176,28 +163,33 @@ font_draw_char:
     ret
 
 font_draw_string:
-    ; rdi=x, rsi=y, rdx=str, ecx=color
     push rbx
-    mov r8d, edi
-    mov r9d, esi
+    push r12
+    push r13
+    push r14
+    push rcx
+
+    mov r12d, edi
+    mov r13d, esi
+    mov r14d, ecx
     mov rbx, rdx
 .loop:
     movzx eax, byte [rbx]
     test al, al
     jz .out
-    mov edi, r8d
-    mov esi, r9d
+    mov edi, r12d
+    mov esi, r13d
     mov dl, al
-    push rbx
-    push r8
-    push r9
+    mov ecx, r14d
     call font_draw_char
-    pop r9
-    pop r8
-    pop rbx
-    add r8d, 7
+    call font_advance
+    add r12d, eax
     inc rbx
     jmp .loop
 .out:
+    pop rcx
+    pop r14
+    pop r13
+    pop r12
     pop rbx
     ret

@@ -19,9 +19,12 @@ stage2_start:
     mov es, ax
     mov ss, ax
     mov sp, 0x7000
+    mov [saved_drive], dl
     sti
 
-    mov [saved_drive], dl
+    mov si, msg_s2
+    call print16
+
     call enable_a20
     jc boot_fail
     call detect_memory_e820
@@ -31,6 +34,7 @@ stage2_start:
     call init_vesa16
     call store_fb_info16
 
+    cli
     lgdt [pm_gdt_desc]
     mov eax, cr0
     or eax, 1
@@ -39,6 +43,7 @@ stage2_start:
 
 [BITS 32]
 pm_start:
+    cli
     mov ax, 0x10
     mov ds, ax
     mov es, ax
@@ -265,6 +270,7 @@ load_kernel16:
     mov dword [kernel_bytes_left], KERNEL_MAX_SECTORS * SECTOR_SIZE
     mov dword [kernel_disk_lba], KERNEL_DISK_SECTOR
     mov dword [kernel_load_phys], KERNEL_LOAD_PHYS
+    call query_chs_geometry
 .load_loop:
     cmp dword [kernel_bytes_left], 0
     je .done
@@ -279,40 +285,102 @@ load_kernel16:
     mov ah, 0x42
     mov dl, [saved_drive]
     int 0x13
-    jc .retry_read
-    jmp .advance
-.retry_read:
-    push dx
-    mov ah, 0x42
-    mov si, kernel_dap
-    mov dl, 0xE0
-    int 0x13
-    jc .try_hdd
-    mov [saved_drive], dl
-    jmp .advance_pop
-.try_hdd:
-    mov ah, 0x42
-    mov si, kernel_dap
-    mov dl, 0x80
-    int 0x13
+    jnc .advance
+    call read_sector_chs
     jc .load_fail
-    mov [saved_drive], dl
-.advance_pop:
-    pop dx
 .advance:
-    movzx eax, word [kernel_dap + 2]
-    shl eax, 9
+    mov eax, SECTOR_SIZE
     sub [kernel_bytes_left], eax
     add [kernel_load_phys], eax
-    movzx eax, word [kernel_dap + 2]
-    add [kernel_disk_lba], eax
+    inc dword [kernel_disk_lba]
     jmp .load_loop
 .load_fail:
-    pop dx
     stc
     ret
 .done:
     clc
+    ret
+
+; Query CHS geometry of the boot drive via INT 13h AH=08h.
+; El Torito emulated drives usually lack INT 13h extensions (AH=4xh),
+; so CHS is the only reliable access path when booting from CD.
+query_chs_geometry:
+    push es
+    push di
+    mov byte [chs_spt], 0
+    mov byte [chs_heads], 0
+    xor di, di
+    mov es, di
+    mov ah, 0x08
+    mov dl, [saved_drive]
+    int 0x13
+    jc .out
+    mov al, cl
+    and al, 0x3F
+    mov [chs_spt], al
+    mov al, dh
+    inc al
+    mov [chs_heads], al
+.out:
+    pop di
+    pop es
+    ret
+
+; Read the sector at [kernel_disk_lba] into [kernel_load_phys] using CHS.
+read_sector_chs:
+    push es
+    push eax
+    push ebx
+    push ecx
+    push edx
+
+    movzx ebx, byte [chs_spt]
+    test bx, bx
+    jz .fail
+    movzx ecx, byte [chs_heads]
+    test cx, cx
+    jz .fail
+
+    mov eax, [kernel_disk_lba]
+    xor edx, edx
+    div ebx
+    mov [chs_sector], dl
+    inc byte [chs_sector]
+    xor edx, edx
+    div ecx
+    mov [chs_head], dl
+    mov [chs_cyl], ax
+
+    mov eax, [kernel_load_phys]
+    shr eax, 4
+    mov es, ax
+    xor bx, bx
+
+    mov ax, [chs_cyl]
+    mov ch, al
+    mov cl, ah
+    shl cl, 6
+    or cl, [chs_sector]
+    mov dh, [chs_head]
+    mov dl, [saved_drive]
+    mov ax, 0x0201
+    int 0x13
+    jc .fail
+
+    pop edx
+    pop ecx
+    pop ebx
+    pop eax
+    pop es
+    clc
+    ret
+.fail:
+    pop edx
+    pop ecx
+    pop ebx
+    pop eax
+    pop es
+    stc
     ret
 
 boot_fail:
@@ -336,6 +404,8 @@ init_vesa16:
     mov ax, 0x4F00
     mov di, vesa_info
     int 0x10
+    call vesa_pick_best16
+    jnc .pci_fb
     mov ax, 0x4F02
     mov bx, 0x4118
     int 0x10
@@ -395,6 +465,101 @@ init_vesa16:
     mov dword [vesa_mode + 0x10], 320
     mov byte [gfx_mode_ok], 1
 .done:
+    ret
+
+vesa_pick_best16:
+    push es
+    mov word [vesa_best_mode], 0
+    mov word [vesa_best_score], 0
+    mov word [vesa_best_score + 2], 0
+    mov word [vesa_list_count], 256
+    mov ax, [vesa_info + 0x0E]
+    mov [vesa_list_off], ax
+    mov ax, [vesa_info + 0x10]
+    mov [vesa_list_seg], ax
+.scan:
+    cmp word [vesa_list_count], 0
+    je .decide
+    dec word [vesa_list_count]
+    mov ax, [vesa_list_seg]
+    mov es, ax
+    mov si, [vesa_list_off]
+    mov cx, [es:si]
+    cmp cx, 0xFFFF
+    je .decide
+    add word [vesa_list_off], 2
+    mov ax, ds
+    mov es, ax
+    call vesa_score_mode16
+    jmp .scan
+.decide:
+    mov ax, ds
+    mov es, ax
+    cmp word [vesa_best_mode], 0
+    je .fail
+    mov cx, [vesa_best_mode]
+    mov [vesa_selected_mode], cx
+    mov bx, cx
+    or bx, 0x4000
+    mov ax, 0x4F02
+    int 0x10
+    cmp ax, 0x004F
+    jne .fail
+    mov cx, [vesa_best_mode]
+    mov ax, 0x4F01
+    mov di, vesa_mode
+    int 0x10
+    cmp ax, 0x004F
+    jne .fail
+    mov byte [gfx_mode_ok], 1
+    pop es
+    clc
+    ret
+.fail:
+    pop es
+    stc
+    ret
+
+vesa_score_mode16:
+    mov [vesa_probe_num], cx
+    mov ax, 0x4F01
+    mov di, vesa_mode
+    int 0x10
+    cmp ax, 0x004F
+    jne .out
+    mov ax, [vesa_mode + 0x00]
+    test ax, 0x0001
+    jz .out
+    test ax, 0x0010
+    jz .out
+    test ax, 0x0080
+    jz .out
+    cmp byte [vesa_mode + 0x19], 32
+    jne .out
+    cmp byte [vesa_mode + 0x1B], 6
+    jne .out
+    mov ax, [vesa_mode + 0x12]
+    test ax, ax
+    jz .out
+    cmp ax, VESA_MAX_WIDTH
+    ja .out
+    mov bx, [vesa_mode + 0x14]
+    test bx, bx
+    jz .out
+    cmp bx, VESA_MAX_HEIGHT
+    ja .out
+    mul bx
+    cmp dx, [vesa_best_score + 2]
+    ja .better
+    jb .out
+    cmp ax, [vesa_best_score]
+    jbe .out
+.better:
+    mov [vesa_best_score], ax
+    mov [vesa_best_score + 2], dx
+    mov cx, [vesa_probe_num]
+    mov [vesa_best_mode], cx
+.out:
     ret
 
 vesa_try_mode:
@@ -597,39 +762,39 @@ pci_find_framebuffer16:
     je .next_func
     cmp eax, 0
     je .next_func
-    cmp ax, 0x1111
+    cmp ax, 0x1234
     jne .chk_vbox
     shr eax, 16
-    cmp ax, 0x1234
+    cmp ax, 0x1111
     je .scan_bars
 .chk_vbox:
     mov eax, [pci_cfg_addr]
-    and eax, 0xFFFF00FF
+    and eax, 0xFFFFFF00
     mov [pci_cfg_addr], eax
     call pci_cfg_read16
-    cmp ax, 0xBEEF
+    cmp ax, 0x80EE
     jne .chk_class
     shr eax, 16
-    cmp ax, 0x80EE
+    cmp ax, 0xBEEF
     je .scan_bars
 .chk_class:
     mov eax, [pci_cfg_addr]
-    and eax, 0xFFFF00FF
+    and eax, 0xFFFFFF00
     or eax, 8
     mov [pci_cfg_addr], eax
     call pci_cfg_read16
-    shr eax, 8
+    shr eax, 16
     and eax, 0xFFFF
     cmp ax, 0x0300
     jne .next_func
 .scan_bars:
     mov eax, [pci_cfg_addr]
-    and eax, 0xFFFF00FF
+    and eax, 0xFFFFFF00
     mov [pci_cfg_addr], eax
     mov cl, 0x10
 .bar_loop:
     mov eax, [pci_cfg_addr]
-    and eax, 0xFFFF00FF
+    and eax, 0xFFFFFF00
     movzx edx, cl
     or eax, edx
     mov [pci_cfg_addr], eax
@@ -757,6 +922,7 @@ parse_elf32:
     mov dword [kernel_entry], KERNEL_LOAD_PHYS
     ret
 
+
 setup_paging:
     mov edi, PML4_PHYS
     xor eax, eax
@@ -793,11 +959,6 @@ setup_paging:
     mov esi, eax
     shl esi, 21
     add edx, esi
-    cmp edx, 0xE0000000
-    jb .norm_pte
-    or edx, 0x93
-    jmp .store_pte
-.norm_pte:
     or edx, 0x83
 .store_pte:
     mov [edi], edx
@@ -831,6 +992,11 @@ enter_lm:
     jmp 0x08:lm_start
 
 saved_drive: db 0
+chs_spt: db 0
+chs_heads: db 0
+chs_sector: db 0
+chs_head: db 0
+chs_cyl: dw 0
 e820_count: dw 0
 rsdp_segment: dw 0
 kernel_entry: dd KERNEL_LOAD_PHYS
@@ -860,6 +1026,12 @@ vesa_mode_table:
     dw 0x0000
 
 vesa_selected_mode: dw 0
+vesa_best_mode:  dw 0
+vesa_best_score: dd 0
+vesa_list_seg:   dw 0
+vesa_list_off:   dw 0
+vesa_list_count: dw 0
+vesa_probe_num:  dw 0
 
 align 8
 pm_gdt:

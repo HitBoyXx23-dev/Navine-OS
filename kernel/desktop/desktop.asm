@@ -30,7 +30,13 @@ extern app_open_monitor
 extern app_open_assistant
 extern app_open_editor
 extern app_open_plugins
-extern app_open_studio
+extern app_open_discord
+extern mission_control_toggle
+extern mission_control_render
+extern gamemode_render_overlay
+extern devmode_render_overlay
+extern gamemode_toggle
+extern devmode_toggle
 %endif
 
 global init_desktop
@@ -210,7 +216,11 @@ render_dock:
     mov edi, ebx
     add edi, 10
     add esi, 8
-    mov edx, 760
+    mov edx, [fb_width]
+    mov eax, ebx
+    shl eax, 1
+    sub edx, eax
+    sub edx, 20
     mov ecx, 2
     mov r8d, 0x8865D6FF
     call fb_fill_rect
@@ -680,16 +690,38 @@ desktop_handle_key:
     je .spot_focus_one
     cmp dl, 0x06
     je .spot_focus_two
+    cmp dl, 0x07
+    je .spot_discord
 .normal:
+    cmp dl, 0x44
+    je .discord
     cmp dl, 0x42
     je .files
     cmp dl, 0x3F
     je .system
     cmp dl, 0x43
     je .doom
+    cmp dl, 0x32
+    je .mission
+    cmp dl, 0x22
+    je .game
+    cmp dl, 0x23
+    je .dev
     cmp dl, 0x39
     jne .done
     call desktop_toggle_spotlight
+    mov eax, 1
+    ret
+.mission:
+    call mission_control_toggle
+    mov eax, 1
+    ret
+.game:
+    call gamemode_toggle
+    mov eax, 1
+    ret
+.dev:
+    call devmode_toggle
     mov eax, 1
     ret
 .spot_terminal:
@@ -707,6 +739,11 @@ desktop_handle_key:
     mov byte [spotlight_open], 0
     mov eax, 1
     ret
+.spot_discord:
+    call app_open_discord
+    mov byte [spotlight_open], 0
+    mov eax, 1
+    ret
 .files:
     call files_toggle
     mov byte [spotlight_open], 0
@@ -720,6 +757,10 @@ desktop_handle_key:
 .doom:
     call doom_launch
     mov byte [spotlight_open], 0
+    mov eax, 1
+    ret
+.discord:
+    call app_open_discord
     mov eax, 1
     ret
 .done:
@@ -864,8 +905,13 @@ desktop_handle_mouse:
     jl .focus_one
     cmp ecx, 430
     jl .done
-    cmp ecx, 520
+    cmp ecx, 526
+    jl .open_discord
+    cmp ecx, 590
     jl .focus_two
+    jmp .done
+.open_discord:
+    call app_open_discord
     jmp .done
 .open_terminal:
     mov byte [windows + 20], 1
@@ -1195,7 +1241,7 @@ icon_console:     db "CN", 0
 icon_vault:       db "VA", 0
 icon_settings:    db "ST", 0
 icon_focus1:      db "A1", 0
-icon_focus2:      db "A2", 0
+icon_focus2:      db "D", 0
 status_left:      db "secure  audio  net", 0
 user_player_label:  db "Navine OS", 0
 user_builder_label: db "Navine OS", 0
@@ -1213,12 +1259,13 @@ app_code3:       db "Console", 0
 app_creative1:   db "Photos", 0
 app_creative2:   db "Music", 0
 app_creative3:   db "Studio", 0
-spotlight_prompt: db "Navine Search  Type 1-5 to launch", 0
+spotlight_prompt: db "Navine Search  Type 1-6 to launch", 0
 spotlight_line1:  db "1  Console", 0
 spotlight_line2:  db "2  Vault", 0
 spotlight_line3:  db "3  Control Center", 0
 spotlight_line5a: db "4  ", 0
 spotlight_line6a: db "5  ", 0
+spotlight_line7:  db "6  Discord", 0
 linux_apps:       db "Launcher", 0
 linux_places:     db "Workspace", 0
 linux_terminal:   db "Console", 0

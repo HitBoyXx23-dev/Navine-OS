@@ -14,19 +14,9 @@ vga_probe_framebuffer:
     je .out
     call vga_find_pci_bar
     test rax, rax
-    jz .no_bar
-    mov rbx, rax            ; PCI BAR found — move it into rbx for .store
-    jmp .store
-.no_bar:
-    mov rax, FB_INFO_PHYS
-    mov rbx, [rax]
-    test rbx, rbx
-    jnz .store
-    mov rbx, 0xE0000000
-.store:
+    jz .out
     mov rcx, FB_INFO_PHYS
-    mov [rcx], rbx
-    call vga_bga_enable_mode
+    mov [rcx], rax
 .out:
     ret
 

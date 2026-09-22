@@ -12,8 +12,8 @@
 %define STAGE2_MAGIC           0x3249564E
 %define STAGE2_MAGIC_OFFSET    2
 %define KERNEL_DISK_SECTOR     34
-%define KERNEL_MAX_SECTORS     1024
-%define DISK_TOTAL_SECTORS     65536
+%define KERNEL_MAX_SECTORS     256
+%define DISK_TOTAL_SECTORS     71680
 %define PML4_PHYS              0x00320000
 %define PDPT_PHYS              0x00321000
 %define PD_PHYS                0x00322000
@@ -28,6 +28,11 @@
 %define INSTALL_FLAG_PHYS      0x00005200
 %define INSTALL_FLAG_SECTOR    1
 %define INSTALL_MAGIC          0x4956414E
+%define INSTALL_MODE_MAC       0
+%define INSTALL_MODE_LINUX     1
+%define INSTALL_MODE_WINDOWS   2
+%define INSTALL_MODE_HYBRID    3
+%define HYBRID_EDITION_MAGIC   0x48425244
 %define DOOM_WAD_SIZE_PHYS     0x00005020
 %define DOOM_LOAD_PHYS         0x02000000
 %define DOOM_WAD_PHYS          0x03000000
@@ -40,8 +45,34 @@
 %define NAVAPP_LOAD_PHYS       0x01800000
 %define WALLPAPER_LBA          12800
 %define WALLPAPER_SECTORS      16200
+%define WALLPAPER_SRC_W        1920
+%define WALLPAPER_SRC_H        1080
 %define WALLPAPER_PHYS         0x00800000
 %define COMPOSITOR_BACKBUFFER_PHYS 0x01000000
+%define FILE_CACHE_PHYS            0x04000000
+%define PE_LOAD_PHYS               0x04800000
+%define ELF_LOAD_PHYS              0x05000000
+%define NAVINEFS_DATA_LBA          40000
+%define NAVINEFS_INODE_LBA         40001
+%define NAVINEFS_JOURNAL_LBA       40128
+%define NAVINEFS_SUPER_SECTORS     8
+%define NAVINEFS_MAX_INODES        64
+%define NAVINEFS_JOURNAL_ENTRIES   64
+%define PROC_STACK_SIZE            16384
+%define PROC_KERNEL_STACK          0x00360000
+%define PROC_USER_STACK_BASE       0x06000000
+%define NET_RX_DESC_PHYS           0x05500000
+%define NET_TX_DESC_PHYS           0x05501000
+%define NET_RX_BUF_PHYS            0x05502000
+%define NET_TX_BUF_PHYS            0x05512000
+%define NET_PKT_BUF_PHYS           0x05522000
+%define NET_FETCH_BUF_PHYS         0x05524000
+%define NET_DESC_COUNT             8
+%define NET_RX_BUF_SIZE            2048
+%define NET_IP_ADDR                0x0F02000A
+%define NET_GATEWAY                0x0202000A
+%define NET_DNS                    0x0A000203
+%define NET_SUBNET                 0xFFFFFF00
 %ifndef DOOM_WAD_INC
 %define DOOM_WAD_SECTORS       3584
 %define DOOM_WAD_BYTES         (DOOM_WAD_SECTORS * SECTOR_SIZE)
@@ -107,9 +138,11 @@
 %define SYS_GETTIME            40
 
 ; VESA mode
-%define VESA_WIDTH             1920
-%define VESA_HEIGHT            1080
+%define VESA_WIDTH             1024
+%define VESA_HEIGHT            768
 %define VESA_BPP               32
+%define VESA_MAX_WIDTH         1920
+%define VESA_MAX_HEIGHT        1200
 
 ; NavineFS magic
 %define NAVINEFS_MAGIC         0x4E415649
