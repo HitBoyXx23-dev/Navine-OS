@@ -36,4 +36,5 @@ powershell -File tools\qemu-test.ps1 -Iso "build\Navine OS Linux Desktop.iso" -O
 
 ## Source
 
-Repository: https://github.com/NavineDevs/Navine-OS
+- Working tree / ISOs: https://github.com/HitBoyXx23-dev/Navine-OS/releases/tag/v1.0.0
+- Upstream target: https://github.com/NavineDevs/Navine-OS

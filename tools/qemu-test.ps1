@@ -44,6 +44,7 @@ $qemuArgs = @(
 if ($Iso)       { $qemuArgs += @("-cdrom", "`"$Iso`"", "-boot", "d") }
 if ($DiskImage) { $qemuArgs += @("-drive", "file=`"$DiskImage`",format=raw,if=ide", "-boot", "c") }
 if ($SerialLog) { $qemuArgs += @("-serial", "file:`"$SerialLog`"") }
+$qemuArgs += @("-netdev", "user,id=n0", "-device", "e1000,netdev=n0")
 
 Write-Host "Booting $bootLabel, capturing after $BootSeconds seconds..."
 

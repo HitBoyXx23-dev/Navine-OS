@@ -24,8 +24,11 @@ foreach ($entry in $upload) {
 }
 
 $notes = Join-Path $root "RELEASE_NOTES.md"
+$ErrorActionPreference = "Continue"
 gh release view $Tag -R $Repo 2>$null | Out-Null
-if ($LASTEXITCODE -eq 0) {
+$viewExit = $LASTEXITCODE
+$ErrorActionPreference = "Stop"
+if ($viewExit -eq 0) {
     Write-Host "Release $Tag exists; uploading assets..."
     gh release upload $Tag @upload -R $Repo --clobber
 } else {

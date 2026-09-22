@@ -6,6 +6,19 @@ Roadmap: [Production plan (VM daily-driver → real OS)](docs/PRODUCTION_ROADMAP
 
 **DOOM** is included as a real built-in game on the custom Desktop edition. The desktop UI is clean and modern — not DOOM-themed.
 
+## Downloads
+
+**v1.0.0 ISOs:** https://github.com/HitBoyXx23-dev/Navine-OS/releases/tag/v1.0.0
+
+(Official `NavineDevs/Navine-OS` release publishing needs write access for the build account — tracked in that repo’s issues.)
+
+| Asset | Edition |
+|-------|---------|
+| `Navine.OS.Linux.Desktop.iso` | Debian XFCE live + installer (recommended) |
+| `Navine.OS.Linux.CLI.iso` | Alpine terminal live |
+| `Navine.OS.Desktop.iso` | Custom graphical kernel |
+| `Navine.OS.CLI.iso` | Custom terminal kernel |
+
 ## Editions
 
 | Edition | ISO | Description |
