@@ -1,0 +1,17 @@
+#!/bin/sh
+echo "Navine OS"
+if [ -f /etc/navine-release ]; then
+    cat /etc/navine-release
+elif [ -f /etc/os-release ]; then
+    . /etc/os-release
+    echo "$PRETTY_NAME"
+fi
+echo
+uname -sr
+echo "Hostname: $(hostname 2>/dev/null || echo navine)"
+if command -v free >/dev/null 2>&1; then
+    free -h | head -2
+fi
+if command -v df >/dev/null 2>&1; then
+    df -h / 2>/dev/null | tail -1
+fi

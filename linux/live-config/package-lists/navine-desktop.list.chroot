@@ -1,8 +1,9 @@
-# Navine OS Linux desktop packages
 xfce4
 xfce4-goodies
 xfce4-terminal
 xfce4-whiskermenu-plugin
+xfce4-power-manager
+xfce4-screenshooter
 lightdm
 lightdm-gtk-greeter
 network-manager
@@ -13,6 +14,8 @@ linux-image-amd64
 firmware-linux-free
 firmware-linux-nonfree
 firmware-misc-nonfree
+firmware-realtek
+firmware-iwlwifi
 pipewire
 pipewire-audio
 wireplumber
@@ -21,8 +24,24 @@ firefox-esr
 thunar
 mousepad
 ristretto
-xfce4-screenshooter
-xfce4-power-manager
+gparted
+htop
+neofetch
+git
+curl
+wget
+unzip
+zip
+ca-certificates
+openssl
+fonts-noto-core
+fonts-noto-color-emoji
+fonts-liberation
+gvfs
+gvfs-backends
+xdg-utils
+xdg-user-dirs
+policykit-1
 calamares
 calamares-settings-debian
 grub-pc-bin
@@ -37,5 +56,5 @@ live-boot
 live-config
 live-config-systemd
 live-tools
-openssl
-ca-certificates
+plymouth
+plymouth-themes

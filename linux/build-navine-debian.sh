@@ -56,11 +56,11 @@ lb config \
     --apt-recommends true \
     --cache-packages false \
     --cache-stages false \
-    --iso-volume "NAVINE_LINUX" \
-    --iso-application "Navine OS Linux" \
+    --iso-volume "NAVINE_OS" \
+    --iso-application "Navine OS" \
     --iso-preparer "Navine OS" \
-    --iso-publisher "Navine OS" \
-    --bootappend-live "boot=live components quiet splash" \
+    --iso-publisher "NavineDevs" \
+    --bootappend-live "boot=live components hostname=navine quiet splash" \
     --initramfs live-boot \
     --initsystem systemd \
     --memtest none \

@@ -36,26 +36,29 @@ mkdir -p "$ROOTFS/dev" "$ROOTFS/proc" "$ROOTFS/sys" "$ROOTFS/tmp" "$ROOTFS/run" 
 echo "[3/6] Applying Navine branding"
 
 cat > "$ROOTFS/etc/os-release" <<EOF
-NAME="Navine OS Linux CLI"
+NAME="Navine OS"
 ID=navine-cli
 ID_LIKE=alpine
-VERSION_ID=${VERSION}
-PRETTY_NAME="Navine OS Linux CLI ${VERSION}"
-HOME_URL="https://github.com/NavineDevs"
+VERSION_ID=1.0
+VERSION_CODENAME=horizon
+PRETTY_NAME="Navine OS CLI 1.0 (Horizon)"
+HOME_URL="https://github.com/NavineDevs/Navine-OS"
+VARIANT="CLI"
+VARIANT_ID=cli
 EOF
 
 echo "navine" > "$ROOTFS/etc/hostname"
 
 cat > "$ROOTFS/etc/issue" <<EOF
-Navine OS Linux ${VERSION} \\r \\l
+Navine OS CLI 1.0 \\r \\l
 
 EOF
 
 cat > "$ROOTFS/etc/motd" <<'EOF'
-Welcome to Navine OS Linux.
+Welcome to Navine OS CLI 1.0 (Horizon).
 
-This is a live in-memory system; changes are lost on reboot.
-Type 'navine-help' for a short command reference.
+Live in-memory system — changes are lost on reboot.
+Type 'navine-help' for commands.
 EOF
 
 cat > "$ROOTFS/etc/navine-banner" <<'EOF'
@@ -68,7 +71,7 @@ cat > "$ROOTFS/etc/navine-banner" <<'EOF'
     ##   ### ##     ##   ## ##    ##  ##   ### ##
     ##    ## ##     ##    ###    #### ##    ## ########
 
-                  N A V I N E   O S   L I N U X
+           N A V I N E   O S   C L I   1 . 0   ( H O R I Z O N )
 
 EOF
 
@@ -82,15 +85,15 @@ EOF
 cat > "$ROOTFS/usr/bin/navine-help" <<'EOF'
 #!/bin/sh
 cat <<'HELP'
-Navine OS Linux - command reference
+Navine OS CLI 1.0 (Horizon)
 
-  ls / cd / cat / vi      standard file tools
+  navine-help             this text
   ip addr / ip link       network interfaces
-  udhcpc -i eth0          request a DHCP lease (also runs at boot)
-  ps / top / free         process and memory info
-  poweroff / reboot       shut down the machine
+  udhcpc -i eth0          DHCP (also runs at boot)
+  ps / top / free         process and memory
+  poweroff / reboot       shut down
 
-Live system: all changes are stored in RAM only.
+Live RAM-only system. For a full desktop, use Navine OS Horizon (Linux Desktop ISO).
 HELP
 EOF
 chmod 755 "$ROOTFS/usr/bin/navine-help"
@@ -176,16 +179,16 @@ PROMPT 0
 TIMEOUT 50
 DEFAULT navine
 
-MENU TITLE Navine OS Linux ${VERSION}
+MENU TITLE Navine OS CLI ${VERSION}
 
 LABEL navine
-    MENU LABEL Start Navine OS Linux
+    MENU LABEL Start Navine OS CLI
     LINUX /boot/vmlinuz
     INITRD /boot/initramfs.gz
     APPEND console=ttyS0,115200 console=tty0 quiet
 
 LABEL navineverbose
-    MENU LABEL Start Navine OS Linux (verbose boot)
+    MENU LABEL Start Navine OS CLI (verbose)
     LINUX /boot/vmlinuz
     INITRD /boot/initramfs.gz
     APPEND console=ttyS0,115200 console=tty0
@@ -195,8 +198,8 @@ echo "[6/6] Creating ISO"
 rm -f "$OUT"
 xorriso -as mkisofs \
     -o "$OUT" \
-    -V "NAVINE_LINUX" \
-    -A "Navine OS Linux ${VERSION}" \
+    -V "NAVINE_OS_CLI" \
+    -A "Navine OS CLI ${VERSION}" \
     -b isolinux/isolinux.bin \
     -c isolinux/boot.cat \
     -no-emul-boot -boot-load-size 4 -boot-info-table \

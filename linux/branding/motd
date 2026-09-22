@@ -1,4 +1,8 @@
-Welcome to Navine OS Linux.
+Welcome to Navine OS 1.0 (Horizon).
 
-This is a live desktop system. Use Calamares from the desktop to install to disk.
-Type navine-help in a terminal for a short command reference.
+This is a custom Linux distribution for everyday desktop use.
+- Network: NetworkManager (usually connected automatically)
+- Install to disk: open "Install Navine OS" on the desktop
+- Help: run  navine-help  or  navine-about
+
+Live sessions keep changes in RAM unless you install.

@@ -11,12 +11,38 @@ if [ ! -d "$BRAND" ]; then
 fi
 
 install -Dm644 "$BRAND/os-release" /etc/os-release
+install -Dm644 "$BRAND/os-release" /usr/lib/os-release
+install -Dm644 "$BRAND/lsb-release" /etc/lsb-release
+install -Dm644 "$BRAND/navine-release" /etc/navine-release
 install -Dm644 "$BRAND/hostname" /etc/hostname
 install -Dm644 "$BRAND/issue" /etc/issue
+install -Dm644 "$BRAND/issue" /etc/issue.net
 install -Dm644 "$BRAND/motd" /etc/motd
 install -Dm644 "$BRAND/navine-banner" /etc/navine-banner
 install -Dm755 "$BRAND/navine-help" /usr/local/bin/navine-help
+install -Dm755 "$BRAND/navine-about" /usr/local/bin/navine-about
 install -Dm644 "$BRAND/profile-navine.sh" /etc/profile.d/navine.sh
+
+mkdir -p /usr/share/navine
+cp -a "$BRAND/." /usr/share/navine/ 2>/dev/null || true
+
+echo "Navine OS 1.0 (Horizon)" > /etc/debian_version_navine
+if [ -f /etc/debian_version ]; then
+    echo "bookworm/sid" > /etc/debian_version
+fi
+
+mkdir -p /etc/apt/apt.conf.d
+cat > /etc/apt/apt.conf.d/90navine <<'EOF'
+APT::Get::Always-Include-Phased-Updates "true";
+Acquire::Languages "none";
+EOF
+
+mkdir -p /etc/apt/sources.list.d
+cat > /etc/apt/sources.list.d/navine-debian.list <<'EOF'
+deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware
+deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware
+deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
+EOF
 
 mkdir -p /etc/lightdm/lightdm.conf.d
 cat > /etc/lightdm/lightdm.conf.d/50-navine.conf <<'EOF'
@@ -24,7 +50,12 @@ cat > /etc/lightdm/lightdm.conf.d/50-navine.conf <<'EOF'
 autologin-user=live
 autologin-user-timeout=0
 user-session=xfce
+greeter-session=lightdm-gtk-greeter
 EOF
+
+if [ -f "$BRAND/lightdm-gtk-greeter.conf" ]; then
+    install -Dm644 "$BRAND/lightdm-gtk-greeter.conf" /etc/lightdm/lightdm-gtk-greeter.conf
+fi
 
 mkdir -p /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml
 if [ -f "$BRAND/xfce4-panel.xml" ]; then
@@ -40,13 +71,26 @@ fi
 mkdir -p /usr/share/backgrounds/navine
 if [ -f "$BRAND/wallpaper.png" ]; then
     install -Dm644 "$BRAND/wallpaper.png" /usr/share/backgrounds/navine/wallpaper.png
+    mkdir -p /usr/share/images/desktop-base
+    ln -sfn /usr/share/backgrounds/navine/wallpaper.png /usr/share/images/desktop-base/desktop-background
 fi
+
+cat > /usr/share/applications/navine-about.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=About Navine OS
+Comment=Show Navine OS version and system info
+Exec=xfce4-terminal -e navine-about
+Icon=help-about
+Terminal=false
+Categories=System;
+EOF
 
 cat > /usr/share/applications/navine-calamares.desktop <<'EOF'
 [Desktop Entry]
 Type=Application
-Name=Install Navine OS Linux
-Comment=Install Navine OS Linux to your hard drive
+Name=Install Navine OS
+Comment=Install Navine OS to your hard drive
 Exec=pkexec calamares
 Icon=system-installer
 Terminal=false
@@ -54,7 +98,9 @@ Categories=System;
 EOF
 
 mkdir -p /etc/skel/Desktop
-ln -sf /usr/share/applications/navine-calamares.desktop /etc/skel/Desktop/Install\ Navine\ OS\ Linux.desktop
+ln -sf /usr/share/applications/navine-calamares.desktop /etc/skel/Desktop/Install\ Navine\ OS.desktop
+ln -sf /usr/share/applications/navine-about.desktop /etc/skel/Desktop/About\ Navine\ OS.desktop
+ln -sf /usr/share/applications/firefox-esr.desktop /etc/skel/Desktop/Firefox.desktop 2>/dev/null || true
 
 mkdir -p /etc/calamares/branding/navine
 cat > /etc/calamares/branding/navine/branding.desc <<'EOF'
@@ -66,15 +112,15 @@ windowExpanding: normal
 windowSize: 800px,520px
 windowPlacement: center
 strings:
-    productName: Navine OS Linux
+    productName: Navine OS
     version: "1.0"
     shortVersion: "1.0"
-    versionedName: Navine OS Linux 1.0
+    versionedName: Navine OS 1.0 Horizon
     shortVersionedName: Navine 1.0
-    bootloaderEntryName: Navine OS Linux
+    bootloaderEntryName: Navine OS
     productUrl: https://github.com/NavineDevs/Navine-OS
-    supportUrl: https://github.com/NavineDevs/Navine-OS
-    releaseNotesUrl: https://github.com/NavineDevs/Navine-OS/releases
+    supportUrl: https://github.com/NavineDevs/Navine-OS/issues
+    releaseNotesUrl: https://github.com/HitBoyXx23-dev/Navine-OS/releases
 images:
     productLogo: "/usr/share/backgrounds/navine/wallpaper.png"
     productIcon: "/usr/share/backgrounds/navine/wallpaper.png"
@@ -96,7 +142,7 @@ Presentation {
         Rectangle { anchors.fill: parent; color: "#0B1220" }
         Text {
             anchors.centerIn: parent
-            text: "Installing Navine OS Linux"
+            text: "Installing Navine OS 1.0 Horizon"
             color: "#E8EEF8"
             font.pixelSize: 28
         }
@@ -108,5 +154,38 @@ if [ -f /etc/calamares/settings.conf ]; then
     sed -i 's/^branding:.*/branding: navine/' /etc/calamares/settings.conf || true
 fi
 
-echo "Navine OS Linux branding applied."
+mkdir -p /etc/default
+if [ -f /etc/default/grub ]; then
+    sed -i 's/^GRUB_DISTRIBUTOR=.*/GRUB_DISTRIBUTOR="Navine OS"/' /etc/default/grub || true
+else
+    cat > /etc/default/grub <<'EOF'
+GRUB_DISTRIBUTOR="Navine OS"
+GRUB_TIMEOUT=5
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
+EOF
+fi
 
+mkdir -p /etc/neofetch
+cat > /etc/neofetch/config.conf <<'EOF'
+print_info() {
+    info title
+    info underline
+    info "OS" distro
+    info "Host" model
+    info "Kernel" kernel
+    info "Uptime" uptime
+    info "Packages" packages
+    info "Shell" shell
+    info "DE" de
+    info "WM" wm
+    info "Terminal" term
+    info "CPU" cpu
+    info "Memory" memory
+}
+distro_shorthand="on"
+os_arch="on"
+EOF
+
+chmod 755 /usr/local/bin/navine-help /usr/local/bin/navine-about
+
+echo "Navine OS Horizon branding applied."

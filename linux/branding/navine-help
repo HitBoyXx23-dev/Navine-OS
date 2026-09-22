@@ -1,14 +1,16 @@
 #!/bin/sh
-cat <<'HELP'
-Navine OS Linux - command reference
+cat <<'EOF'
+Navine OS — command reference
 
-  Applications menu     XFCE desktop and panel
-  Calamares             Install Navine OS Linux to disk
-  Terminal              xfce4-terminal
+  navine-about          show edition and version
+  navine-help           this help text
+  firefox-esr           web browser
+  thunar                file manager
+  xfce4-terminal        terminal
+  nmcli device status   network status
+  sudo apt update       update package lists (after install)
+  sudo calamares        launch installer
 
-  sudo -i               root shell (password: live)
-  ip a                  network interfaces
-  poweroff / reboot     shut down the machine
-
-Live system: changes persist only after installing to disk with Calamares.
-HELP
+Live ISO: changes are lost on reboot until you install to disk.
+Docs: https://github.com/NavineDevs/Navine-OS
+EOF
